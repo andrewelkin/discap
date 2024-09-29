@@ -6,8 +6,10 @@ import (
 )
 
 type dataEntry struct {
-	key   string // element's key
-	value any    // the data
+	key         string // element's key
+	value       any    // the data
+	useCounterR int64  // number of reads
+	useCounterW int64  // number of writes
 }
 
 type SingleDataNode struct {
@@ -29,6 +31,7 @@ func (n *SingleDataNode) findLinear(key string, touch bool) (*dataEntry, bool) {
 	for e := n.data.Front(); e != nil; e = e.Next() {
 		if e.Value.(*dataEntry).key == key {
 			if touch {
+				e.Value.(*dataEntry).useCounterR += 1
 				n.data.MoveToFront(e)
 			}
 			return e.Value.(*dataEntry), true
@@ -37,14 +40,14 @@ func (n *SingleDataNode) findLinear(key string, touch bool) (*dataEntry, bool) {
 	return nil, false
 }
 
-// public
-func (n *SingleDataNode) FindLinear(key string) (any, bool) {
+// public, value + counters
+func (n *SingleDataNode) FindLinear(key string) (any, int64, int64, bool) {
 
 	de, ok := n.findLinear(key, true)
 	if ok {
-		return de.value, true
+		return de.value, de.useCounterR, de.useCounterW, true
 	}
-	return nil, false
+	return nil, 0, 0, false
 }
 
 // todo: map search methods
@@ -54,16 +57,19 @@ func (n *SingleDataNode) MaybePushNew(key string, value any) (*dataEntry, bool) 
 
 	de, ok := n.findLinear(key, false)
 	if ok {
+		de.useCounterW += 1
 		return de, false // element exists already
 	}
 	pair := &dataEntry{ // make a new pair
-		key:   key,
-		value: value,
+		key:         key,
+		value:       value,
+		useCounterW: 1,
 	}
 
 	// check the size
 	if n.data.Len() >= n.maxSize {
-		// the list is full, we got to kill the back element. // maybe: once this limit is reached we always kill, without calling Len()
+		// the list is full, we got to kill the back element.
+		//maybe: once this limit is reached we always kill, without calling Len()
 		n.data.Remove(n.data.Back())
 	}
 
