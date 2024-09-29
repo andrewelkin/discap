@@ -76,3 +76,22 @@ func (n *SingleDataNode) MaybePushNew(key string, value any) (*dataEntry, bool) 
 	n.data.PushFront(pair) // push it to the list
 	return pair, true
 }
+
+func (n *SingleDataNode) Invalid(keys ...string) {
+
+	mkeys := make(map[string]any)
+	for _, key := range keys {
+		mkeys[key] = nil
+	}
+	for e := n.data.Front(); e != nil; {
+		current := e
+		e = e.Next()
+		if _, ok := mkeys[current.Value.(*dataEntry).key]; ok {
+			n.data.Remove(current)
+		}
+	}
+}
+
+func (n *SingleDataNode) InvalidAll() {
+	n.data = list.New()
+}
