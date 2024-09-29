@@ -9,15 +9,19 @@ import (
 )
 
 type DateNodesManager struct {
-	nodes         []DataNode.SingleDataNode
+	nodes         []*DataNode.SingleDataNode
 	hash          maphash.Hash
 	numberOfNodes uint64
 }
 
-func (m *DateNodesManager) New(numberOfNodes int) *DateNodesManager {
+func (m *DateNodesManager) New(numberOfNodes int, maxsize int) *DateNodesManager {
 
 	m.numberOfNodes = uint64(numberOfNodes)
-	m.nodes = make([]DataNode.SingleDataNode, numberOfNodes)
+	m.nodes = make([]*DataNode.SingleDataNode, numberOfNodes)
+	for i := range m.nodes {
+
+		m.nodes[i] = (&DataNode.SingleDataNode{}).New(maxsize)
+	}
 	return m
 }
 
@@ -48,7 +52,7 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 		if len(values) > 0 {
 			return map[string]string{
 				"status":  "Error",
-				"message": "For a get request there should be no values,, only keys",
+				"message": "For a get request there should be no values, only keys",
 			}
 
 		}
@@ -73,7 +77,8 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 		for i := range m.nodes {
 			go func(nodeNdx int, node *DataNode.SingleDataNode, keyArr []string) {
 				results[nodeNdx] = node.FindMultipleKeysAr(keyArr)
-			}(i, &m.nodes[i], keyArrays[i])
+				wg.Done()
+			}(i, m.nodes[i], keyArrays[i])
 		}
 		wg.Wait()
 		var resp []string
