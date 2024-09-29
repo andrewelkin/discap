@@ -25,40 +25,61 @@ func (n *SingleDataNode) New(maxSize int) *SingleDataNode {
 }
 
 // private
-// touch == true -> move to front, as it is a new fresh now
-func (n *SingleDataNode) findLinear(key string, touch bool) (*dataEntry, bool) {
+
+func (n *SingleDataNode) findLinear(key string) (*list.Element, bool) {
 	// Simply iterate through the list, O(n)
 	for e := n.data.Front(); e != nil; e = e.Next() {
 		if e.Value.(*dataEntry).key == key {
-			if touch {
-				e.Value.(*dataEntry).useCounterR += 1
-				n.data.MoveToFront(e)
-			}
-			return e.Value.(*dataEntry), true
+			return e, true
 		}
 	}
 	return nil, false
 }
 
 // public, value + counters
-func (n *SingleDataNode) FindLinear(key string) (any, int64, int64, bool) {
+func (n *SingleDataNode) FindSingleKey(key string) (any, int64, int64, bool) {
 
-	de, ok := n.findLinear(key, true)
+	e, ok := n.findLinear(key)
 	if ok {
+		de := e.Value.(*dataEntry)
+		de.useCounterR += 1
+		n.data.MoveToFront(e)
 		return de.value, de.useCounterR, de.useCounterW, true
 	}
 	return nil, 0, 0, false
 }
 
+func (n *SingleDataNode) FindMultipleKeys(keys ...string) []*dataEntry {
+
+	var res []*dataEntry
+	if n.data.Len() > 0 {
+		mkeys := make(map[string]any)
+		for _, key := range keys {
+			mkeys[key] = nil
+		}
+		for e := n.data.Front(); e != nil; e = e.Next() {
+			if _, ok := mkeys[e.Value.(*dataEntry).key]; ok {
+				e.Value.(*dataEntry).useCounterR += 1
+				n.data.MoveToFront(e)
+				res = append(res, e.Value.(*dataEntry))
+			}
+		}
+	}
+	return res
+}
+
 // todo: map search methods
 
-// true: success story
-func (n *SingleDataNode) MaybePushNew(key string, value any) (*dataEntry, bool) {
+// true: new element
+func (n *SingleDataNode) PutSingle(key string, value any) bool {
 
-	de, ok := n.findLinear(key, false)
+	e, ok := n.findLinear(key)
 	if ok {
-		de.useCounterW += 1
-		return de, false // element exists already
+		de := e.Value.(*dataEntry)
+		de.useCounterW++
+		de.value = value
+		n.data.MoveToFront(e)
+		return false // element exists already
 	}
 	pair := &dataEntry{ // make a new pair
 		key:         key,
@@ -74,7 +95,19 @@ func (n *SingleDataNode) MaybePushNew(key string, value any) (*dataEntry, bool) 
 	}
 
 	n.data.PushFront(pair) // push it to the list
-	return pair, true
+	return true
+}
+
+// ret how new many added
+func (n *SingleDataNode) MaybePushMultiple(newPairs map[string]any) int {
+
+	var count int
+	for k, v := range newPairs {
+		if n.PutSingle(k, v) {
+			count++
+		}
+	}
+	return count
 }
 
 func (n *SingleDataNode) Invalid(keys ...string) {
