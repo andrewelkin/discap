@@ -23,10 +23,14 @@ func (n *SingleDataNode) New(maxSize int) *SingleDataNode {
 }
 
 // private
-func (n *SingleDataNode) findLinear(key string) (*dataEntry, bool) {
-	// Simply iterate through the list, O(1)
+// touch == true -> move to front, as it is a new fresh now
+func (n *SingleDataNode) findLinear(key string, touch bool) (*dataEntry, bool) {
+	// Simply iterate through the list, O(n)
 	for e := n.data.Front(); e != nil; e = e.Next() {
 		if e.Value.(*dataEntry).key == key {
+			if touch {
+				n.data.MoveToFront(e)
+			}
 			return e.Value.(*dataEntry), true
 		}
 	}
@@ -36,7 +40,7 @@ func (n *SingleDataNode) findLinear(key string) (*dataEntry, bool) {
 // public
 func (n *SingleDataNode) FindLinear(key string) (any, bool) {
 
-	de, ok := n.findLinear(key)
+	de, ok := n.findLinear(key, true)
 	if ok {
 		return de.value, true
 	}
@@ -48,7 +52,7 @@ func (n *SingleDataNode) FindLinear(key string) (any, bool) {
 // true: success story
 func (n *SingleDataNode) MaybePushNew(key string, value any) (*dataEntry, bool) {
 
-	de, ok := n.findLinear(key)
+	de, ok := n.findLinear(key, false)
 	if ok {
 		return de, false // element exists already
 	}
