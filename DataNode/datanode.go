@@ -2,6 +2,7 @@ package DataNode
 
 import (
 	"container/list"
+	"fmt"
 	"sync"
 )
 
@@ -52,13 +53,35 @@ func (n *SingleDataNode) FindSingleKey(key string) (any, int64, int64, bool) {
 	return nil, 0, 0, false
 }
 
+func (n *SingleDataNode) FindMultipleKeysAr(keys []string) map[string]any {
+
+	n.Lock()
+	defer n.Unlock()
+	var res map[string]any
+	if n.data.Len() > 0 {
+		res = make(map[string]any)
+		mkeys := make(map[string]int)
+		for _, key := range keys {
+			mkeys[key] = 0
+		}
+		for e := n.data.Front(); e != nil; e = e.Next() {
+			if _, ok := mkeys[e.Value.(*dataEntry).key]; ok {
+				e.Value.(*dataEntry).useCounterR += 1
+				n.data.MoveToFront(e)
+				res[e.Value.(*dataEntry).key] = e.Value.(*dataEntry).value
+			}
+		}
+	}
+	return res
+}
+
 func (n *SingleDataNode) FindMultipleKeys(keys ...string) map[string]any {
 
 	n.Lock()
 	defer n.Unlock()
 	var res map[string]any
 	if n.data.Len() > 0 {
-		res := make(map[string]any)
+		res = make(map[string]any)
 		mkeys := make(map[string]int)
 		for _, key := range keys {
 			mkeys[key] = 0
@@ -102,6 +125,18 @@ func (n *SingleDataNode) PutSingle(key string, value any) bool {
 
 	n.data.PushFront(pair) // push it to the list
 	return true
+}
+
+func (n *SingleDataNode) MaybePushMultipleAr(keys []string, values []any) error {
+
+	if len(values) != len(keys) {
+		return fmt.Errorf("bad keys/values array dimensions %d/%d", len(keys), len(values))
+	}
+	for i, k := range keys {
+		go n.PutSingle(k, values[i])
+	}
+
+	return nil
 }
 
 func (n *SingleDataNode) MaybePushMultiple(newPairs map[string]any) {
