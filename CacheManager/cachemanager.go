@@ -24,12 +24,9 @@ func (m *DateNodesManager) New(numberOfNodes int) *DateNodesManager {
 func (m *DateNodesManager) calcNodeIndex(key string) int {
 
 	m.hash.Reset()
-	m.hash.WriteString(key)
+	_, _ = m.hash.WriteString(key)
 	sum := m.hash.Sum64()
 	return int(sum % m.numberOfNodes)
-}
-
-type response struct {
 }
 
 func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, values []string) any {
@@ -38,9 +35,9 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 
 	case "del":
 		count := 0
-		for _, node := range m.nodes {
-			count += node.Len()
-			node.InvalidAll()
+		for i := range m.nodes {
+			count += m.nodes[i].Len()
+			m.nodes[i].InvalidAll()
 		}
 		return map[string]any{
 			"status":  "OK",
@@ -57,8 +54,8 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 		}
 		if len(keys) == 0 { // status request
 			var resp []string
-			for i, n := range m.nodes {
-				resp = append(resp, fmt.Sprintf("node %03d length %d", i, n.Len()))
+			for i := range m.nodes {
+				resp = append(resp, fmt.Sprintf("node %03d length %d", i, m.nodes[i].Len()))
 			}
 			return map[string]any{
 				"status":  "OK",
@@ -73,10 +70,10 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 		}
 		var wg sync.WaitGroup
 		wg.Add(int(m.numberOfNodes))
-		for i, node := range m.nodes {
-			go func() {
-				results[i] = node.FindMultipleKeysAr(keyArrays[i])
-			}()
+		for i := range m.nodes {
+			go func(nodeNdx int, node *DataNode.SingleDataNode, keyArr []string) {
+				results[nodeNdx] = node.FindMultipleKeysAr(keyArr)
+			}(i, &m.nodes[i], keyArrays[i])
 		}
 		wg.Wait()
 		var resp []string
@@ -108,8 +105,8 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 		}
 
 		var errAll error
-		for i, node := range m.nodes {
-			err := node.MaybePushMultipleAr(keyArrays[i], valueArrays[i])
+		for i := range m.nodes {
+			err := m.nodes[i].MaybePushMultipleAr(keyArrays[i], valueArrays[i])
 			if err != nil {
 				errAll = errors.Join(errAll, err)
 			}
