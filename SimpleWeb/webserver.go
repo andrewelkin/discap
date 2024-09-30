@@ -15,26 +15,30 @@ type JustWebServer struct {
 
 func (s *JustWebServer) justHandler(w http.ResponseWriter, r *http.Request) {
 
-	values := r.URL.Query()
-	var resp any
+	go func(w http.ResponseWriter, r *http.Request) {
+		values := r.URL.Query()
+		var resp any
 
-	switch r.Method {
-
-	case http.MethodPost:
-		resp = s.cacheManager.HandleCacheRequest("put", values["key"], values["value"])
-	case http.MethodGet:
-		resp = s.cacheManager.HandleCacheRequest("get", values["key"], nil)
-	case http.MethodDelete:
-		resp = s.cacheManager.HandleCacheRequest("del", nil, nil)
-	default:
-		resp = map[string]any{
-			"status":  "Error",
-			"message": "Unknown request type, we support only POST GET and DELETE!",
+		switch r.Method {
+		case http.MethodPost:
+			resp = s.cacheManager.HandleCacheRequest("put", values["key"], values["value"])
+		case http.MethodGet:
+			resp = s.cacheManager.HandleCacheRequest("get", values["key"], nil)
+		case http.MethodDelete:
+			resp = s.cacheManager.HandleCacheRequest("del", nil, nil)
+		default:
+			resp = map[string]any{
+				"status":  "Error",
+				"message": "Unknown request type, we support only POST GET and DELETE!",
+			}
 		}
-	}
 
-	b, _ := json.Marshal(&resp)
-	io.WriteString(w, string(b))
+		b, _ := json.Marshal(&resp)
+		bs := string(b)
+		fmt.Println(bs)
+
+		io.WriteString(w, bs)
+	}(w, r)
 
 }
 

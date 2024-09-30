@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/andrewelkin/discap/CacheManager"
+	"github.com/andrewelkin/discap/DataNode"
 	"github.com/andrewelkin/discap/SimpleWeb"
 	"os"
 	"strconv"
@@ -36,7 +38,18 @@ func main() {
 
 	fmt.Printf("\nCache manager and web server are starting on port %d, max size: %d, number of nodes: %d\n", port, nodeMaxSize, numberOfNodes)
 
-	CacheManager := (&CacheManager.DateNodesManager{}).New(numberOfNodes, nodeMaxSize)
+	ctx, _ := context.WithCancel(context.Background())
+
+	// create the data nodes and get their channels
+	nodeChannels := make([]chan DataNode.DNRequest, numberOfNodes)
+	for i := 0; i < numberOfNodes; i++ {
+		nodeChannels[i] = (&DataNode.SingleDataNode{}).New(ctx, nodeMaxSize).GetChannel()
+	}
+
+	// create the cache manager and give him the channels of the nodes
+	CacheManager := (&CacheManager.DateNodesManager{}).New(ctx, nodeChannels)
+
+	// start the simplest web server and give him the Cache manager
 	(&SimpleWeb.JustWebServer{}).StartAndServe(port, CacheManager)
 
 }

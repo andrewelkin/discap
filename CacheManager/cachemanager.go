@@ -1,7 +1,8 @@
 package CacheManager
 
 import (
-	"errors"
+	"context"
+
 	"fmt"
 	"github.com/andrewelkin/discap/DataNode"
 	"hash/maphash"
@@ -9,28 +10,29 @@ import (
 )
 
 type DateNodesManager struct {
-	nodes         []*DataNode.SingleDataNode
+	nodeCh        []chan DataNode.DNRequest
+	nodeBackCh    []chan DataNode.DNResponse
 	hash          maphash.Hash
-	numberOfNodes uint64
+	numberOfNodes int
 }
 
-func (m *DateNodesManager) New(numberOfNodes int, maxsize int) *DateNodesManager {
+func (m *DateNodesManager) New(ctx context.Context, nodeChannels []chan DataNode.DNRequest) *DateNodesManager {
 
-	m.numberOfNodes = uint64(numberOfNodes)
-	m.nodes = make([]*DataNode.SingleDataNode, numberOfNodes)
-	for i := range m.nodes {
-
-		m.nodes[i] = (&DataNode.SingleDataNode{}).New(maxsize)
+	m.nodeCh = nodeChannels
+	m.numberOfNodes = len(nodeChannels)
+	m.nodeBackCh = make([]chan DataNode.DNResponse, m.numberOfNodes)
+	for i := 0; i < m.numberOfNodes; i++ {
+		m.nodeBackCh[i] = make(chan DataNode.DNResponse, 100)
 	}
+
 	return m
 }
 
 func (m *DateNodesManager) calcNodeIndex(key string) int {
-
 	m.hash.Reset()
 	_, _ = m.hash.WriteString(key)
 	sum := m.hash.Sum64()
-	return int(sum % m.numberOfNodes)
+	return int(sum % (uint64(m.numberOfNodes)))
 }
 
 func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, values []string) any {
@@ -38,11 +40,29 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 	switch command {
 
 	case "del":
+
 		count := 0
-		for i := range m.nodes {
-			count += m.nodes[i].Len()
-			m.nodes[i].InvalidAll()
+		var wg sync.WaitGroup
+
+		for i := 0; i < m.numberOfNodes; i++ {
+
+			go func(nodeCh chan DataNode.DNRequest, bkCh chan DataNode.DNResponse) {
+				wg.Add(1)
+				rq := DataNode.DNRequest{
+					Command: "get",
+					BackCh:  bkCh,
+				}
+				nodeCh <- rq
+				// wait the response and send it
+				resp := <-bkCh
+				count += resp.Count
+				wg.Done()
+
+			}(m.nodeCh[i], m.nodeBackCh[i])
 		}
+
+		wg.Wait()
+
 		return map[string]any{
 			"status":  "OK",
 			"message": fmt.Sprintf("%d cache entries deleted", count),
@@ -57,39 +77,56 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 
 		}
 		if len(keys) == 0 { // status request
-			var resp []string
-			for i := range m.nodes {
-				resp = append(resp, fmt.Sprintf("node %03d length %d", i, m.nodes[i].Len()))
+			var results []string
+			for i := 0; i < m.numberOfNodes; i++ {
+				rq := DataNode.DNRequest{
+					Command: "get",
+					BackCh:  m.nodeBackCh[i],
+				}
+				m.nodeCh[i] <- rq
+				resp := <-m.nodeBackCh[i]
+				results = append(results, fmt.Sprintf("node %03d length %d", i, resp.Count))
 			}
+
 			return map[string]any{
 				"status":  "OK",
-				"message": resp,
+				"message": results,
 			}
 		}
 
 		keyArrays := make([][]string, m.numberOfNodes)
-		results := make([]map[string]any, m.numberOfNodes)
+		result := make(map[string]any)
 		for _, k := range keys {
 			keyArrays[m.calcNodeIndex(k)] = append(keyArrays[m.calcNodeIndex(k)], k)
 		}
 		var wg sync.WaitGroup
-		wg.Add(int(m.numberOfNodes))
-		for i := range m.nodes {
-			go func(nodeNdx int, node *DataNode.SingleDataNode, keyArr []string) {
-				results[nodeNdx] = node.FindMultipleKeysAr(keyArr)
-				wg.Done()
-			}(i, m.nodes[i], keyArrays[i])
-		}
-		wg.Wait()
-		var resp []string
-		for _, r := range results {
-			for k, v := range r {
-				resp = append(resp, fmt.Sprintf("key '%s' value '%s'", k, v))
+
+		for i := 0; i < m.numberOfNodes; i++ {
+			if len(keyArrays[i]) > 0 {
+				go func(keyAr []string, nodeCh chan DataNode.DNRequest, bkCh chan DataNode.DNResponse) {
+
+					wg.Add(1)
+					rq := DataNode.DNRequest{
+						Command: "get",
+						Keys:    keyAr,
+						BackCh:  bkCh,
+					}
+					nodeCh <- rq
+					// wait for the response
+					resp := <-bkCh
+					for j, k := range resp.Keys {
+						result[k] = resp.Values[j]
+					}
+					wg.Done()
+
+				}(keyArrays[i], m.nodeCh[i], m.nodeBackCh[i])
+
 			}
 		}
+		wg.Wait()
 		return map[string]any{
-			"status":  "OK",
-			"message": resp,
+			"status": "OK",
+			"result": result,
 		}
 
 	case "put":
@@ -109,22 +146,46 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 			valueArrays[m.calcNodeIndex(k)] = append(valueArrays[m.calcNodeIndex(k)], values[i])
 		}
 
-		var errAll error
-		for i := range m.nodes {
-			err := m.nodes[i].MaybePushMultipleAr(keyArrays[i], valueArrays[i])
-			if err != nil {
-				errAll = errors.Join(errAll, err)
+		var errMessages []string
+		var results []string
+		var wg sync.WaitGroup
+		count := 0
+		for i := 0; i < m.numberOfNodes; i++ {
+			if len(keyArrays[i]) > 0 {
+				go func(keyAr []string, valAr []any, nodeCh chan DataNode.DNRequest, bkCh chan DataNode.DNResponse, ndx int) {
+					wg.Add(1)
+					rq := DataNode.DNRequest{
+						Command: "put",
+						Keys:    keyAr,
+						Values:  valAr,
+						BackCh:  bkCh,
+					}
+
+					nodeCh <- rq
+					resp := <-bkCh
+					count += resp.Count
+					wg.Done()
+					if resp.Status != "OK" {
+						errMessages = append(errMessages, fmt.Sprintf("node %d error: %s", ndx, resp.Message))
+					} else {
+						results = append(results, fmt.Sprintf("node %d:  %s", ndx, resp.Message))
+					}
+
+				}(keyArrays[i], valueArrays[i], m.nodeCh[i], m.nodeBackCh[i], i)
 			}
 		}
-		if errAll != nil {
-			return map[string]string{
+		wg.Wait()
+
+		if len(errMessages) != 0 {
+			return map[string]any{
 				"status":  "Error",
-				"message": errAll.Error(),
+				"message": errMessages,
 			}
 		} else {
-			return map[string]string{
+			return map[string]any{
 				"status":  "OK",
-				"message": fmt.Sprintf("%d key/value pairs are sent to the cache", len(keys)),
+				"message": fmt.Sprintf("%d key/value pairs are sent to the cache", count),
+				"debug":   results,
 			}
 		}
 	}
