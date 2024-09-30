@@ -50,7 +50,7 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 			go func(nodeCh chan DataNode.DNRequest, bkCh chan DataNode.DNResponse) {
 
 				rq := DataNode.DNRequest{
-					Command: "get",
+					Command: "del",
 					BackCh:  bkCh,
 				}
 				nodeCh <- rq
