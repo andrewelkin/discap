@@ -196,16 +196,16 @@ func (n *SingleDataNode) mainLoop() {
 				}
 
 			} else if rq.Command == "put" {
-				fmt.Printf("putting %d records\n", len(rq.Keys))
+				//fmt.Printf("putting %d records\n", len(rq.Keys))
 				err := n.maybePushMultiple(rq.Keys, rq.Values)
 				if err != nil {
-					fmt.Printf("error: %s\n", err.Error())
+					//fmt.Printf("error: %s\n", err.Error())
 					rq.BackCh <- DNResponse{
 						Status:  "Error",
 						Message: err.Error(),
 					}
 				} else {
-					fmt.Printf("stored %d records\n", len(rq.Keys))
+					//fmt.Printf("stored %d records\n", len(rq.Keys))
 					rq.BackCh <- DNResponse{
 						Status:  "OK",
 						Message: fmt.Sprintf("stored %d records", len(rq.Keys)),
@@ -213,7 +213,7 @@ func (n *SingleDataNode) mainLoop() {
 					}
 				}
 			} else if rq.Command == "get" {
-				fmt.Printf("getting %d records\n", len(rq.Keys))
+				//fmt.Printf("getting %d records\n", len(rq.Keys))
 
 				if len(rq.Keys) == 0 {
 					rq.BackCh <- DNResponse{

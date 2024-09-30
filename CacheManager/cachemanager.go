@@ -115,7 +115,6 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 					nodeCh <- rq
 					// wait for the response
 					resp := <-bkCh
-					fmt.Printf("response (get) %v", resp)
 					for j, k := range resp.Keys {
 						result[k] = resp.Values[j]
 					}
@@ -166,7 +165,6 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 
 					nodeCh <- rq
 					resp := <-bkCh
-					fmt.Printf("response (put) %v", resp)
 					count += resp.Count
 					wg.Done()
 					if resp.Status != "OK" {
