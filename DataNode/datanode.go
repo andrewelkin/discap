@@ -92,14 +92,21 @@ func (n *SingleDataNode) findMultipleKeys(keys []string) (resKeys []string, resV
 		for _, key := range keys {
 			mkeys[key] = 0
 		}
+
+		var needTouch []*list.Element
 		for e := n.data.Front(); e != nil; e = e.Next() {
 			if _, ok := mkeys[e.Value.(*dataEntry).key]; ok {
 				e.Value.(*dataEntry).useCounterR += 1
-				n.data.MoveToFront(e)
+				needTouch = append(needTouch, e)
 				resKeys = append(resKeys, e.Value.(*dataEntry).key)
 				resValues = append(resValues, e.Value.(*dataEntry).value)
 			}
 		}
+
+		for _, e := range needTouch {
+			n.data.MoveToFront(e)
+		}
+
 	}
 	return resKeys, resValues
 }

@@ -46,8 +46,9 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 
 		for i := 0; i < m.numberOfNodes; i++ {
 
+			wg.Add(1)
 			go func(nodeCh chan DataNode.DNRequest, bkCh chan DataNode.DNResponse) {
-				wg.Add(1)
+
 				rq := DataNode.DNRequest{
 					Command: "get",
 					BackCh:  bkCh,
@@ -103,9 +104,9 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 
 		for i := 0; i < m.numberOfNodes; i++ {
 			if len(keyArrays[i]) > 0 {
-				go func(keyAr []string, nodeCh chan DataNode.DNRequest, bkCh chan DataNode.DNResponse) {
+				wg.Add(1)
+				go func(keyAr []string, nodeCh chan DataNode.DNRequest, bkCh chan DataNode.DNResponse, result map[string]any) {
 
-					wg.Add(1)
 					rq := DataNode.DNRequest{
 						Command: "get",
 						Keys:    keyAr,
@@ -114,12 +115,13 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 					nodeCh <- rq
 					// wait for the response
 					resp := <-bkCh
+					fmt.Printf("response (get) %v", resp)
 					for j, k := range resp.Keys {
 						result[k] = resp.Values[j]
 					}
 					wg.Done()
 
-				}(keyArrays[i], m.nodeCh[i], m.nodeBackCh[i])
+				}(keyArrays[i], m.nodeCh[i], m.nodeBackCh[i], result)
 
 			}
 		}
@@ -152,8 +154,9 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 		count := 0
 		for i := 0; i < m.numberOfNodes; i++ {
 			if len(keyArrays[i]) > 0 {
+				wg.Add(1)
 				go func(keyAr []string, valAr []any, nodeCh chan DataNode.DNRequest, bkCh chan DataNode.DNResponse, ndx int) {
-					wg.Add(1)
+
 					rq := DataNode.DNRequest{
 						Command: "put",
 						Keys:    keyAr,
@@ -163,6 +166,7 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 
 					nodeCh <- rq
 					resp := <-bkCh
+					fmt.Printf("response (put) %v", resp)
 					count += resp.Count
 					wg.Done()
 					if resp.Status != "OK" {
