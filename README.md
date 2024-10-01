@@ -42,7 +42,9 @@ It has a simple web server supporting three requests:
 
 
 POST to store key/value pairs
+
 GET to retrieve pairs
+
 DELETE to clear the cache
 
 
