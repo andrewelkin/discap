@@ -11,7 +11,7 @@ func TestSingleDataNode_storeMultipleRecords(t *testing.T) {
 	ctx := context.Background()
 	size := 3
 
-	n := (&SingleDataNode{}).New(ctx, size)
+	n := (&SingleDataNode{}).New(ctx, "000", size)
 
 	keys := []string{
 		"key1",
@@ -64,7 +64,7 @@ func TestSingleDataNode_findMultipleKeys(t *testing.T) {
 	ctx := context.Background()
 	size := 3
 
-	n := (&SingleDataNode{}).New(ctx, size)
+	n := (&SingleDataNode{}).New(ctx, "000", size)
 
 	keys := []string{
 		"key1",
@@ -120,8 +120,7 @@ func TestSingleDataNode_storeMultipleRecordsEviction(t *testing.T) {
 	ctx := context.Background()
 	size := 3
 
-	n := (&SingleDataNode{}).New(ctx, size)
-
+	n := (&SingleDataNode{}).New(ctx, "000", size)
 	keys := []string{
 		"key1",
 		"key2",

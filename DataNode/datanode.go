@@ -4,7 +4,7 @@ import (
 	"container/list"
 	"context"
 	"fmt"
-
+	"log"
 	"sync"
 )
 
@@ -14,7 +14,6 @@ type dataEntry struct {
 	value       any    // the data
 	useCounterR int64  // number of reads
 	useCounterW int64  // number of writes
-
 }
 
 // DNRequest is a request struct sent from manager to the node
@@ -44,6 +43,7 @@ type SingleDataNode struct {
 	data       *list.List               // data storage. Note: we will keep fresh data in the front, we will kill old data from the back
 	dataMap    map[string]*list.Element // map of the elements
 	maxSize    int                      // node capacity
+	nodeId     string                   // id for logging
 }
 
 // New  constructs a node
@@ -52,10 +52,11 @@ type SingleDataNode struct {
 // maxSize     int                 node max size
 // <-- Output:
 // 1) *SingleDataNode     initialized node
-func (n *SingleDataNode) New(ctx context.Context, maxSize int) *SingleDataNode {
+func (n *SingleDataNode) New(ctx context.Context, id string, maxSize int) *SingleDataNode {
 	n.data = list.New()
 	n.dataMap = make(map[string]*list.Element)
 	n.ctx = ctx
+	n.nodeId = id
 	n.maxSize = maxSize
 	n.dataCh = make(chan DNRequest, queueSize)
 	go n.mainLoop()
@@ -183,16 +184,16 @@ func (n *SingleDataNode) mainLoop() {
 				}
 
 			} else if rq.Command == "put" { // store/update some records
-				//fmt.Printf("putting %d records\n", len(rq.Keys))
+				log.Printf("[%s] putting %d records\n", n.nodeId, len(rq.Keys))
 				err := n.storeMultipleRecords(rq.Keys, rq.Values)
 				if err != nil {
-					//fmt.Printf("error: %s\n", err.Error())
+					log.Printf("[%s] error storeMultipleRecords: %s\n", n.nodeId, err.Error())
 					rq.BackCh <- DNResponse{
 						Status:  "Error",
 						Message: err.Error(),
 					}
 				} else {
-					//fmt.Printf("stored %d records\n", len(rq.Keys))
+					log.Printf("[%s] stored %d records\n", n.nodeId, len(rq.Keys))
 					rq.BackCh <- DNResponse{
 						Status:  "OK",
 						Message: fmt.Sprintf("stored %d records", len(rq.Keys)),
@@ -200,15 +201,16 @@ func (n *SingleDataNode) mainLoop() {
 					}
 				}
 			} else if rq.Command == "get" { // find records
-				//fmt.Printf("getting %d records\n", len(rq.Keys))
-
 				if len(rq.Keys) == 0 {
+					l := n.Len()
+					log.Printf("[%s] current length %d\n", n.nodeId, l)
 					rq.BackCh <- DNResponse{
 						Status: "OK",
-						Count:  n.Len(),
+						Count:  l,
 					}
 
 				} else {
+					log.Printf("[%s] getting %d records\n", n.nodeId, len(rq.Keys))
 					resKeys, resValues := n.findMultipleKeys(rq.Keys)
 					rq.BackCh <- DNResponse{
 						Status: "OK",

@@ -3,6 +3,7 @@ package CacheManager
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/andrewelkin/discap/DataNode"
 	"testing"
 )
@@ -18,7 +19,7 @@ func TestDateNodesManager_HandleCacheRequest(t *testing.T) {
 	// create the data nodes and get their channels
 	nodeChannels := make([]chan<- DataNode.DNRequest, numberOfNodes)
 	for i := 0; i < numberOfNodes; i++ {
-		nodeChannels[i] = (&DataNode.SingleDataNode{}).New(ctx, nodeMaxSize).GetChannel()
+		nodeChannels[i] = (&DataNode.SingleDataNode{}).New(ctx, fmt.Sprintf("%03d", i), nodeMaxSize).GetChannel()
 	}
 	// create the cache manager and give him the channels of the nodes
 	m := (&DateNodesManager{}).New(ctx, nodeChannels)

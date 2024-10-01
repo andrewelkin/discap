@@ -2,6 +2,8 @@ package CacheManager
 
 import (
 	"context"
+	"log"
+	"sync/atomic"
 
 	"fmt"
 	"github.com/andrewelkin/discap/DataNode"
@@ -79,6 +81,7 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 
 		wg.Wait()
 
+		log.Printf("[CMg] Cache deleted")
 		return map[string]any{
 			"status":  "OK",
 			"message": fmt.Sprintf("%d cache entries deleted", count),
@@ -116,6 +119,7 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 			keyArrays[m.calcNodeIndex(k)] = append(keyArrays[m.calcNodeIndex(k)], k)
 		}
 		var wg sync.WaitGroup
+		var count atomic.Int64
 
 		for i := 0; i < m.numberOfNodes; i++ {
 			if len(keyArrays[i]) > 0 {
@@ -130,6 +134,7 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 					nodeCh <- rq   // send request to a node
 					resp := <-bkCh // get the response
 					for j, k := range resp.Keys {
+						count.Add(1)
 						result[k] = resp.Values[j]
 					}
 					wg.Done()
@@ -139,6 +144,7 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 			}
 		}
 		wg.Wait()
+		log.Printf("[CMg] %d key/value pairs are retrieved from the cache", count.Load())
 		return map[string]any{
 			"status": "OK",
 			"result": result,
@@ -147,9 +153,12 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 	case "put": // request to store/update the keys
 
 		if len(values) != len(keys) || len(keys) == 0 {
+			em := "For a put request there should be equal nonzero number of keys and values"
+			log.Printf("[CMg] %s", em)
+
 			return map[string]string{
 				"status":  "Error",
-				"message": "For a put request there should be equal nonzero number of keys and values",
+				"message": em,
 			}
 		}
 
@@ -164,7 +173,7 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 		var errMessages []string
 		var results []string
 		var wg sync.WaitGroup
-		count := 0
+		var count atomic.Int64
 		for i := 0; i < m.numberOfNodes; i++ {
 			if len(keyArrays[i]) > 0 {
 				wg.Add(1)
@@ -179,7 +188,7 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 
 					nodeCh <- rq   // send request to a node
 					resp := <-bkCh // get the response
-					count += resp.Count
+					count.Add(int64(resp.Count))
 					wg.Done()
 					if resp.Status != "OK" {
 						errMessages = append(errMessages, fmt.Sprintf("node %d error: %s", ndx, resp.Message))
@@ -193,11 +202,13 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 		wg.Wait()
 
 		if len(errMessages) != 0 {
+			log.Printf("[CMg] error: %v ", errMessages)
 			return map[string]any{
 				"status":  "Error",
 				"message": errMessages,
 			}
 		} else {
+			log.Printf("[CMg] %d key/value pairs are sent to the cache", count.Load())
 			return map[string]any{
 				"status":  "OK",
 				"message": fmt.Sprintf("%d key/value pairs are sent to the cache", count),
