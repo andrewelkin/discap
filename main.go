@@ -19,7 +19,7 @@ import (
 // the main accepts three parameters, the cmd line syntax is:
 //  [-p=<port number>] [-s=<node size>] [-n=<number of nodes>]
 // example:
-//   discap -p=8080 -s=2048 -n=42
+//   go run main.go -p=8080 -s=2048 -n=42
 // the defaults are 8089 , 50 and 3
 //
 

@@ -149,30 +149,13 @@ func (n *SingleDataNode) storeMultipleRecords(keys []string, values []any) error
 	return nil
 }
 
-// deletes certain records
-func (n *SingleDataNode) invalid(keys ...string) {
-
-	n.Lock()
-	defer n.Unlock()
-	mkeys := make(map[string]int)
-	for _, key := range keys {
-		mkeys[key] = 0
-	}
-	for e := n.data.Front(); e != nil; {
-		current := e
-		e = e.Next()
-		if _, ok := mkeys[current.Value.(*dataEntry).key]; ok {
-			n.data.Remove(current)
-		}
-	}
-}
-
 // kills all data, returns number of records deleted
 func (n *SingleDataNode) deleteAllRecords() (count int) {
 	n.Lock()
 	defer n.Unlock()
 	count = n.data.Len()
 	n.data = list.New()
+	n.dataMap = make(map[string]*list.Element)
 	return
 }
 
