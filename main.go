@@ -59,9 +59,9 @@ func main() {
 	}
 
 	// create the cache manager and give him the channels of the nodes
-	CacheManager := (&CacheManager.DateNodesManager{}).New(ctx, nodeChannels)
+	cacheManager := (&CacheManager.DateNodesManager{}).New(ctx, nodeChannels)
 
 	// start the simplest web server and give him the Cache manager
-	(&SimpleWeb.JustWebServer{}).StartAndServe(port, CacheManager)
+	(&SimpleWeb.JustWebServer{}).StartAndServe(port, cacheManager)
 
 }
