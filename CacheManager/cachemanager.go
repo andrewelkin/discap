@@ -57,7 +57,7 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 
 	switch command {
 
-	case "del": // request to cleat the cache
+	case "del": // request to clear the cache
 
 		count := 0
 		var wg sync.WaitGroup
