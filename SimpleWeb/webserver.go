@@ -9,6 +9,7 @@ import (
 	"os"
 )
 
+// JustWebServer is a primitive web server. it keeps a pointer to the cache manager and passes requests
 type JustWebServer struct {
 	cacheManager *CacheManager.DateNodesManager
 }
@@ -32,9 +33,13 @@ func (s *JustWebServer) justHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	b, _ := json.Marshal(&resp)
-	io.WriteString(w, string(b))
+	_, _ = io.WriteString(w, string(b))
 }
 
+// StartAndServe starts a simple web server. it passes requests to the cache manager
+// --> Input:
+// port             int                                port to listen, 8089 default
+// cacheManager     *CacheManager.DateNodesManager     points to cache manager
 func (s *JustWebServer) StartAndServe(port int, cacheManager *CacheManager.DateNodesManager) {
 
 	s.cacheManager = cacheManager

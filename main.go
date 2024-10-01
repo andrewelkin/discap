@@ -11,10 +11,22 @@ import (
 	"strings"
 )
 
+// the main creates three components:
+// * web server accepting GET POST and DELETE requests
+// * array of data nodes, each of them has a channel to receive requests
+// * cache manager which passes requests/responses between web server and the nodes
+
+// the main accepts three parameters, the cmd line syntax is:
+//  [-p=<port number>] [-s=<node size>] [-n=<number of nodes>]
+// example:
+//   discap -p=8080 -s=2048 -n=42
+// the defaults are 8089 , 50 and 3
+//
+
 func main() {
 
 	numberOfNodes := 3
-	nodeMaxSize := 5
+	nodeMaxSize := 50
 	port := 8089
 
 	for _, a := range os.Args[1:] {
@@ -41,7 +53,7 @@ func main() {
 	ctx, _ := context.WithCancel(context.Background())
 
 	// create the data nodes and get their channels
-	nodeChannels := make([]chan DataNode.DNRequest, numberOfNodes)
+	nodeChannels := make([]chan<- DataNode.DNRequest, numberOfNodes)
 	for i := 0; i < numberOfNodes; i++ {
 		nodeChannels[i] = (&DataNode.SingleDataNode{}).New(ctx, nodeMaxSize).GetChannel()
 	}
