@@ -120,8 +120,10 @@ func (n *SingleDataNode) storeSingleRecord(key string, value any) bool {
 	if n.data.Len() >= n.maxSize {
 		// the list is full, we got to kill the back element.
 		// note: once this limit is reached we always kill, without calling Len(), do we save anything?
+		backEl := n.data.Back()
+		backKey := backEl.Value.(*dataEntry).key
 		n.data.Remove(n.data.Back())
-		delete(n.dataMap, key)
+		delete(n.dataMap, backKey)
 	}
 	e = n.data.PushFront(&dataEntry{ // make a new pair and push it as the most recent
 		key:         key,
@@ -132,6 +134,7 @@ func (n *SingleDataNode) storeSingleRecord(key string, value any) bool {
 	return true
 }
 
+// store records
 func (n *SingleDataNode) storeMultipleRecords(keys []string, values []any) error {
 
 	if len(values) != len(keys) {
@@ -188,7 +191,7 @@ func (n *SingleDataNode) mainLoop() {
 		case <-n.ctx.Done(): // user cancellation
 			return
 		case rq := <-n.dataCh:
-			if rq.Command == "del" {
+			if rq.Command == "del" { // request to clear the cache
 				count := n.deleteAllRecords()
 				rq.BackCh <- DNResponse{
 					Status:  "OK",
@@ -196,7 +199,7 @@ func (n *SingleDataNode) mainLoop() {
 					Message: fmt.Sprintf("deleted %d records", count),
 				}
 
-			} else if rq.Command == "put" {
+			} else if rq.Command == "put" { // store/update some records
 				//fmt.Printf("putting %d records\n", len(rq.Keys))
 				err := n.storeMultipleRecords(rq.Keys, rq.Values)
 				if err != nil {
@@ -213,7 +216,7 @@ func (n *SingleDataNode) mainLoop() {
 						Count:   len(rq.Keys),
 					}
 				}
-			} else if rq.Command == "get" {
+			} else if rq.Command == "get" { // find records
 				//fmt.Printf("getting %d records\n", len(rq.Keys))
 
 				if len(rq.Keys) == 0 {
