@@ -211,7 +211,7 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 			log.Printf("[CMg] %d key/value pairs are sent to the cache", count.Load())
 			return map[string]any{
 				"status":  "OK",
-				"message": fmt.Sprintf("%d key/value pairs are sent to the cache", count),
+				"message": fmt.Sprintf("%d key/value pairs are sent to the cache", count.Load()),
 				"debug":   results,
 			}
 		}
