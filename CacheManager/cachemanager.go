@@ -114,7 +114,8 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 		}
 
 		keyArrays := make([][]string, m.numberOfNodes)
-		result := make(map[string]any)
+		results := make([]map[string]any, m.numberOfNodes)
+
 		for _, k := range keys {
 			keyArrays[m.calcNodeIndex(k)] = append(keyArrays[m.calcNodeIndex(k)], k)
 		}
@@ -122,7 +123,9 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 		var count atomic.Int64
 
 		for i := 0; i < m.numberOfNodes; i++ {
+			results[i] = make(map[string]any)
 			if len(keyArrays[i]) > 0 {
+
 				wg.Add(1)
 				go func(keyAr []string, nodeCh chan<- DataNode.DNRequest, bkCh chan DataNode.DNResponse, result map[string]any) {
 
@@ -139,11 +142,18 @@ func (m *DateNodesManager) HandleCacheRequest(command string, keys []string, val
 					}
 					wg.Done()
 
-				}(keyArrays[i], m.nodeCh[i], m.nodeBackCh[i], result)
+				}(keyArrays[i], m.nodeCh[i], m.nodeBackCh[i], results[i])
 
 			}
 		}
 		wg.Wait()
+		result := make(map[string]any)
+		for i := 0; i < m.numberOfNodes; i++ {
+			for k, v := range results[i] {
+				result[k] = v
+			}
+		}
+
 		log.Printf("[CMg] %d key/value pairs are retrieved from the cache", count.Load())
 		return map[string]any{
 			"status": "OK",
