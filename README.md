@@ -28,8 +28,8 @@ Web server simply passes requests and responses to/from the cache manager.
 ├── main.go                             <- main file
 ├── README.md                           <- this file
 ├── SimpleWeb
-│   └── webserver.go              <- primitive web server
-└── time.log                            <- time spent on the project 
+    └── webserver.go              <- primitive web server
+
 
 ```
 
